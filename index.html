@@ -461,64 +461,192 @@
       }
     }
 
-    // ★フルテキスト（論文全文）データを取得してGeminiで要約する処理
+   // 1. フルテキスト自動取得＆要約処理
     async function summarizeFullTextOnClient(paperId) {
       const paper = liveSearchResults.find(p => p.id === paperId);
       if (!paper) return;
-
-      let apiKey = localStorage.getItem('user_gemini_key');
-      if (!apiKey) {
-        apiKey = prompt("フルテキスト解析用に Google Gemini API Key を入力してください（ブラウザ内に安全に保存されます）:");
-        if (!apiKey) return;
-        localStorage.setItem('user_gemini_key', apiKey);
-      }
 
       const btn = document.getElementById(`btn-sum-${paperId}`);
       const resultDiv = document.getElementById(`ai-summary-result-${paperId}`);
 
       btn.disabled = true;
-      btn.innerHTML = `<span>⏳ 全文取得＆解析中...</span>`;
+      btn.innerHTML = `<span>⏳ 全文取得中...</span>`;
+
+      // Jina Reader APIで自動取得を試みる
+      let fullTextContent = "";
+      try {
+        const jinaUrl = `https://r.jina.ai/${paper.fullTextUrl}`;
+        const fetchRes = await fetch(jinaUrl);
+        if (fetchRes.ok) {
+          fullTextContent = await fetchRes.text();
+        }
+      } catch (e) {
+        console.warn("自動取得失敗:", e);
+      }
+
+      // 自動取得でテキストが200文字未満だった場合 -> 手動入力フォームを表示
+      if (!fullTextContent || fullTextContent.length < 200) {
+        btn.disabled = false;
+        btn.innerHTML = `<span>📄 フルテキスト要約</span>`;
+        showManualInputUI(paperId, "自動取得できませんでした。URLを入力するか、PDFファイルをアップロードしてください。");
+        return;
+      }
+
+      // 自動取得できた場合はそのままテキストでGeminiを呼ぶ
+      await callGeminiApiWithText(paperId, paper.title, fullTextContent.substring(0, 30000));
+    }
+
+    // 2. 手動入力フォーム（URL入力＆PDFアップロード）の表示UI
+    function showManualInputUI(paperId, message = "") {
+      const resultDiv = document.getElementById(`ai-summary-result-${paperId}`);
+      resultDiv.classList.remove('hidden');
+      resultDiv.innerHTML = `
+        <div class="bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-slate-700 p-4 rounded-lg text-xs space-y-3 text-slate-800 dark:text-slate-200">
+          ${message ? `<p class="font-bold text-amber-800 dark:text-amber-400">⚠️ ${message}</p>` : ''}
+          
+          <!-- 手動方法1: URL指定 -->
+          <div>
+            <label class="block font-bold mb-1">🔗 論文のWebページURL / 直PDF URL を入力</label>
+            <div class="flex gap-2">
+              <input type="text" id="manual-url-${paperId}" placeholder="https://..." class="flex-grow p-2 border border-slate-300 rounded text-xs bg-white text-black">
+              <button onclick="summarizeWithManualUrl(${paperId})" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap">URLで要約</button>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-200 dark:border-slate-700 pt-2">
+            <!-- 手動方法2: PDFファイルアップロード -->
+            <label class="block font-bold mb-1">📁 論文のPDFファイルをアップロード</label>
+            <input type="file" id="manual-pdf-${paperId}" accept=".pdf" onchange="summarizeWithManualPdf(${paperId})" class="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+          </div>
+        </div>
+      `;
+    }
+
+    // 3. 手動指定されたURLから要約
+    async function summarizeWithManualUrl(paperId) {
+      const paper = liveSearchResults.find(p => p.id === paperId);
+      const urlInput = document.getElementById(`manual-url-${paperId}`).value.trim();
+      if (!urlInput) return alert("URLを入力してください。");
+
+      const btn = document.getElementById(`btn-sum-${paperId}`);
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳ URLデータ取得中...</span>`;
 
       try {
-        // 1. Jina Reader API を利用して論文全文（またはWEBページ全文）のテキストを取得
-        const jinaUrl = `https://r.jina.ai/${paper.fullTextUrl}`;
-        let fullTextContent = "";
+        const jinaUrl = `https://r.jina.ai/${urlInput}`;
+        const fetchRes = await fetch(jinaUrl);
+        if (!fetchRes.ok) throw new Error("URLからテキストを抽出できませんでした。");
+        const fullText = await fetchRes.text();
+        
+        await callGeminiApiWithText(paperId, paper ? paper.title : "論文", fullText.substring(0, 30000));
+      } catch (err) {
+        alert("エラー: " + err.message);
+        btn.disabled = false;
+        btn.innerHTML = `<span>📄 フルテキスト要約</span>`;
+      }
+    }
 
+    // 4. 手動アップロードされたPDFファイルからGeminiで直接要約
+    async function summarizeWithManualPdf(paperId) {
+      const fileInput = document.getElementById(`manual-pdf-${paperId}`);
+      if (!fileInput.files || fileInput.files.length === 0) return;
+
+      const file = fileInput.files[0];
+      const paper = liveSearchResults.find(p => p.id === paperId);
+      const btn = document.getElementById(`btn-sum-${paperId}`);
+
+      let apiKey = localStorage.getItem('user_gemini_key');
+      if (!apiKey) {
+        apiKey = prompt("Gemini API Key を入力してください:");
+        if (!apiKey) return;
+        localStorage.setItem('user_gemini_key', apiKey);
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳ PDF解析中...</span>`;
+
+      // PDFをBase64データに変換
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const base64Data = e.target.result.split(',')[1];
+        
         try {
-          const fetchRes = await fetch(jinaUrl);
-          if (fetchRes.ok) {
-            fullTextContent = await fetchRes.text();
-          }
-        } catch (e) {
-          console.warn("フルテキスト直接取得失敗、概要フォールバック:", e);
-        }
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+          const promptText = `あなたは心理学の魅力を伝えるプロのサイエンスライターです。この論文PDFの「全文」を解読し、読者の興味を惹きつける最高に面白い解説を作成してください。
 
-        // フルテキストが取れなかった場合はアブストラクト＋タイトルで補完
-        if (!fullTextContent || fullTextContent.length < 200) {
-          fullTextContent = `タイトル: ${paper.title}\n概要データ: ${paper.abstract}`;
-        } else {
-          // テキスト長制限（先頭30,000文字まで抽出してGeminiへ渡す）
-          fullTextContent = fullTextContent.substring(0, 30000);
-        }
+必ず以下のJSONフォーマットのみで出力してください（Markdownの ```json 枠などは含めないでください）。
 
-        // 2. Gemini API 呼び出し（フルテキスト解析）
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-        const promptText = `
-あなたは心理学の専門家です。以下に提供された心理学論文の「フルテキスト本文データ」を熟読・解析し、概要（アブストラクト）だけでは分からない具体的な実験内容や詳細な知見を初心者向けに解説してください。
-
-【論文本文データ】:
-${fullTextContent}
-
-【出力指示】:
-必ず以下のJSON形式のみを出力してください。
 {
-  "full_summary": "本文全体から読み取れる要約（中学生でもわかるように3文程度で）",
-  "method_details": "具体的な実験・調査方法・なぜこの研究を行ったのかという背景（対象人数や実験で何をしたか）",
-  "key_findings": "本文に書かれた具体的な結果・データ・数値的知見",
-  "practical_application": "日常や仕事で今すぐ使える具体アクション"
-}
-`;
+  "title": "読者を惹きつけるキャッチーな日本語タイトル（20文字以内）",
+  "catchy_summary": "本文全体の結論を「1文」でズバッと表すキャッチーな超要約",
+  "humorous_background": "ユーモアと親しみやすさを込めた「なぜこの研究をしたのか？」の解説（例え話や身近な疑問を使ってくすっと笑えるように）",
+  "findings": "具体的に何が分かったのか（実験・調査の方法や対象人数、数値データも含めて分かりやすく）",
+  "originality_pitch": "「ここが最高に面白い！」と熱量高く語る、この研究ならではの独自性・新しさのプレゼン",
+  "practical_application": "日常や仕事で今すぐ試せる具体的なアクション"
+}`;
 
+          const payload = {
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inlineData: { mimeType: "application/pdf", data: base64Data } }
+              ]
+            }],
+            generationConfig: { response_mime_type: "application/json" }
+          };
+
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) throw new Error("PDFの解析に失敗しました。APIキーを確認してください。");
+          const resData = await res.json();
+          const aiJson = JSON.parse(resData.candidates[0].content.parts[0].text);
+
+          renderSummaryResultUI(paperId, aiJson);
+          btn.innerHTML = `<span>PDF解析完了</span>`;
+          btn.classList.replace('bg-indigo-600', 'bg-emerald-600');
+        } catch (err) {
+          alert("PDF解析エラー: " + err.message);
+          btn.disabled = false;
+          btn.innerHTML = `<span>📄 フルテキスト要約</span>`;
+        }
+      };
+
+      reader.readAsDataURL(file);
+    }
+
+    // GeminiへテキストAPIリクエストを送る共通関数
+    async function callGeminiApiWithText(paperId, title, textContent) {
+      let apiKey = localStorage.getItem('user_gemini_key');
+      if (!apiKey) {
+        apiKey = prompt("Gemini API Key を入力してください:");
+        if (!apiKey) return;
+        localStorage.setItem('user_gemini_key', apiKey);
+      }
+
+      const btn = document.getElementById(`btn-sum-${paperId}`);
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳ AI要約生成中...</span>`;
+
+      try {
+        const url = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKey}`;
+        const promptText = `あなたは心理学の魅力を伝えるプロのサイエンスライターです。心理学論文「${title}」のフルテキストを熟読し、読者の興味を惹きつける最高に面白い解説を作成してください。
+
+【本文データ】:
+${textContent}
+
+必ず以下のJSONフォーマットのみで出力してください。
+{
+  "title": "読者を惹きつけるキャッチーな日本語タイトル（20文字以内）",
+  "catchy_summary": "本文全体の結論を「1文」でズバッと表すキャッチーな超要約",
+  "humorous_background": "ユーモアと親しみやすさを込めた「なぜこの研究をしたのか？」の解説（例え話や身近な疑問を使ってくすっと笑えるように）",
+  "findings": "具体的に何が分かったのか（実験・調査の方法や対象人数、数値データも含めて分かりやすく）",
+  "originality_pitch": "「ここが最高に面白い！」と熱量高く語る、この研究ならではの独自性・新しさのプレゼン",
+  "practical_application": "日常や仕事で今すぐ試せる具体的なアクション"
+}`;
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -528,31 +656,33 @@ ${fullTextContent}
           })
         });
 
-        if (!res.ok) throw new Error("APIキーが無効か、送信エラーが発生しました。");
+        if (!res.ok) throw new Error("Gemini APIエラーが発生しました。");
         const resData = await res.json();
         const aiJson = JSON.parse(resData.candidates[0].content.parts[0].text);
 
-        resultDiv.classList.remove('hidden');
-        resultDiv.innerHTML = `
-          <div class="bg-indigo-50 border border-indigo-200 p-4 rounded-lg text-xs space-y-2 text-slate-800">
-            <p class="font-bold text-indigo-900 text-sm border-b border-indigo-200 pb-1">📖 論文フルテキスト（全文）AI解析結果</p>
-            <p><strong>【全文要約】</strong> ${aiJson.full_summary}</p>
-            <p><strong>【実験・調査方法】</strong> ${aiJson.method_details}</p>
-            <p><strong>【判明した詳細結果】</strong> ${aiJson.key_findings}</p>
-            <p><strong>【日常での活用方法】</strong> ${aiJson.practical_application}</p>
-          </div>
-        `;
-
+        renderSummaryResultUI(paperId, aiJson);
         btn.innerHTML = `<span>解析完了</span>`;
         btn.classList.replace('bg-indigo-600', 'bg-emerald-600');
       } catch (err) {
-        alert("フルテキスト解析エラー: " + err.message);
+        alert("要約エラー: " + err.message);
         btn.disabled = false;
         btn.innerHTML = `<span>📄 フルテキスト要約</span>`;
-        if (confirm("APIキーを再設定しますか？")) {
-          localStorage.removeItem('user_gemini_key');
-        }
       }
+    }
+
+    // 解析結果のカード描画関数
+    function renderSummaryResultUI(paperId, aiJson) {
+      const resultDiv = document.getElementById(`ai-summary-result-${paperId}`);
+      resultDiv.classList.remove('hidden');
+      resultDiv.innerHTML = `
+        <div class="bg-indigo-50 dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 p-4 rounded-lg text-xs space-y-2 text-slate-800 dark:text-slate-200">
+          <p class="font-bold text-indigo-900 dark:text-indigo-300 text-sm border-b border-indigo-200 dark:border-slate-700 pb-1">📖 論文フルテキスト（全文）AI解析結果</p>
+          <p><strong>【全文要約】</strong> ${aiJson.full_summary}</p>
+          <p><strong>【実験・調査方法】</strong> ${aiJson.method_details}</p>
+          <p><strong>【判明した詳細結果】</strong> ${aiJson.key_findings}</p>
+          <p><strong>【日常での活用方法】</strong> ${aiJson.practical_application}</p>
+        </div>
+      `;
     }
 
     // イベント設定
