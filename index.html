@@ -84,12 +84,25 @@
     <!-- TAB 2: ライブ論文サーチ -->
     <div id="sectionLive" class="hidden">
       <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-8">
-        <div class="mb-4">
-          <label class="block text-xs font-bold text-slate-500 mb-1">🔍 検索エンジンを選択</label>
-          <select id="searchEngineSelect" class="w-full sm:w-64 p-2 border border-slate-300 rounded-lg text-sm bg-white text-black">
-            <option value="openalex">OpenAlex (世界最大の論文DB)</option>
-            <option value="semanticscholar">Semantic Scholar (AI搭載論文DB)</option>
-          </select>
+        
+        <!-- 検索設定（エンジン選択 ＆ 並び順選択） -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">🔍 検索エンジンを選択</label>
+            <select id="searchEngineSelect" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white text-black">
+              <option value="openalex">OpenAlex (全世界の論文DB)</option>
+              <option value="semanticscholar">Semantic Scholar (AI論文DB)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">📊 並び順（ソート）を選択</label>
+            <select id="searchSortSelect" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white text-black">
+              <option value="cited">被引用数が多い順 (人気順)</option>
+              <option value="newest">最新順 (日付の新しい順)</option>
+              <option value="relevance">関連度順 (キーワード適合性)</option>
+            </select>
+          </div>
         </div>
 
         <!-- 検索入力バー -->
@@ -101,7 +114,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
             </svg>
           </div>
-          <button onclick="executeLiveSearch()" 
+          <button onclick="executeLiveSearch(false)" 
             class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors flex items-center space-x-1 whitespace-nowrap">
             <span>検索</span>
           </button>
@@ -115,6 +128,14 @@
       </div>
 
       <div id="liveResultsGrid" class="grid grid-cols-1 gap-4"></div>
+
+      <!-- 追加検索（もっと読み込む）ボタンエリア -->
+      <div id="loadMoreContainer" class="hidden text-center my-8">
+        <button onclick="executeLiveSearch(true)" id="btnLoadMore"
+          class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-8 py-3 rounded-xl text-sm transition-colors shadow-md">
+          ＋ もっと検索する (さらに10件追加)
+        </button>
+      </div>
     </div>
 
   </main>
@@ -280,29 +301,49 @@
       `).join('');
     }
 
-// 2. 選択されたエンジン（OpenAlex / Semantic Scholar）でのライブ論文サーチ
-// 検索実行関数（エラー処理強化版）
-    async function executeLiveSearch() {
+// 状態管理用変数
+    let liveSearchPage = 1;
+    let currentLiveKeyword = "";
+
+    // 検索実行関数 (isLoadMore: 追加読み込みフラグ)
+    async function executeLiveSearch(isLoadMore = false) {
       const keyword = document.getElementById('liveSearchInput').value.trim();
       if (!keyword) return;
 
       const engine = document.getElementById('searchEngineSelect').value;
+      const sort = document.getElementById('searchSortSelect').value;
       const loading = document.getElementById('liveLoading');
       const grid = document.getElementById('liveResultsGrid');
+      const loadMoreContainer = document.getElementById('loadMoreContainer');
+      const btnLoadMore = document.getElementById('btnLoadMore');
 
-      loading.classList.remove('hidden');
-      grid.innerHTML = '';
+      if (!isLoadMore) {
+        liveSearchPage = 1;
+        currentLiveKeyword = keyword;
+        liveSearchResults = [];
+        grid.innerHTML = '';
+        loading.classList.remove('hidden');
+      } else {
+        liveSearchPage++;
+        btnLoadMore.innerText = "⏳ 読み込み中...";
+        btnLoadMore.disabled = true;
+      }
 
       try {
-        liveSearchResults = [];
+        let newResults = [];
 
         if (engine === 'openalex') {
-          const url = `https://api.openalex.org/works?search=${encodeURIComponent(keyword)}&per-page=10`;
+          // OpenAlex ソート定義
+          let sortParam = "cited_by_count:desc";
+          if (sort === "newest") sortParam = "publication_date:desc";
+          if (sort === "relevance") sortParam = "relevance_score:desc";
+
+          const url = `https://api.openalex.org/works?search=${encodeURIComponent(keyword)}&sort=${sortParam}&page=${liveSearchPage}&per-page=10`;
           const res = await fetch(url);
           if (!res.ok) throw new Error(`OpenAlex APIエラー: Status ${res.status}`);
           const data = await res.json();
           
-          liveSearchResults = (data.results || []).map((item, index) => {
+          newResults = (data.results || []).map((item, index) => {
             let abstractText = "";
             if (item.abstract_inverted_index) {
               const wordPositions = [];
@@ -312,92 +353,122 @@
               wordPositions.sort((a, b) => a[0] - b[0]);
               abstractText = wordPositions.map(x => x[1]).join(' ');
             }
+
+            // フルテキストURLの取得優先順位 (PDF直リンク > OpenAccess URL > DOI)
+            const fullTextUrl = item.primary_location?.pdf_url || item.open_access?.oa_url || item.doi || item.id;
+
             return {
-              id: index,
+              id: liveSearchResults.length + index,
               title: item.title || "タイトルなし",
               year: item.publication_year || '不明',
               citeCount: item.cited_by_count || 0,
-              abstract: abstractText || "アブストラクト情報はありません。",
+              abstract: abstractText || "アブストラクトなし",
               url: item.doi || item.id,
+              fullTextUrl: fullTextUrl,
               source: 'OpenAlex'
             };
           });
         } else {
-          const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(keyword)}&limit=10&fields=title,abstract,year,citationCount,url`;
+          // Semantic Scholar
+          const offset = (liveSearchPage - 1) * 10;
+          const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(keyword)}&offset=${offset}&limit=10&fields=title,abstract,year,citationCount,url,openAccessPdf`;
           const res = await fetch(url);
           if (!res.ok) throw new Error(`Semantic Scholar APIエラー: Status ${res.status}`);
           const data = await res.json();
           
-          liveSearchResults = (data.data || []).map((item, index) => ({
-            id: index,
+          let rawData = data.data || [];
+          // クライアント側でのソート（Semantic Scholar APIのソート補正）
+          if (sort === "cited") rawData.sort((a, b) => (b.citationCount || 0) - (a.citationCount || 0));
+          if (sort === "newest") rawData.sort((a, b) => (b.year || 0) - (a.year || 0));
+
+          newResults = rawData.map((item, index) => ({
+            id: liveSearchResults.length + index,
             title: item.title || "タイトルなし",
             year: item.year || '不明',
             citeCount: item.citationCount || 0,
-            abstract: item.abstract || "アブストラクト情報はありません。",
+            abstract: item.abstract || "アブストラクトなし",
             url: item.url,
+            fullTextUrl: item.openAccessPdf?.url || item.url,
             source: 'Semantic Scholar'
           }));
         }
 
         loading.classList.add('hidden');
+        if (btnLoadMore) {
+          btnLoadMore.innerText = "＋ もっと検索する (さらに10件追加)";
+          btnLoadMore.disabled = false;
+        }
 
-        if (liveSearchResults.length === 0) {
-          grid.innerHTML = `<div class="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500">該当する論文が見つかりませんでした。英語のキーワードを変えて試してください。</div>`;
+        if (newResults.length === 0) {
+          if (!isLoadMore) {
+            grid.innerHTML = `<div class="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500">該当する論文が見つかりませんでした。</div>`;
+          } else {
+            alert("これ以上の追加論文はありません。");
+          }
+          loadMoreContainer.classList.add('hidden');
           return;
         }
 
-        // 論文カード一覧と「要約」ボタンの表示
-        grid.innerHTML = liveSearchResults.map(item => `
+        liveSearchResults = [...liveSearchResults, ...newResults];
+
+        // 描画HTMLの作成
+        const htmlToAppend = newResults.map(item => `
           <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm transition-colors" id="paper-card-${item.id}">
             <div class="flex justify-between items-start gap-2 mb-2">
               <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
                 ${item.source} (${item.year})
               </span>
-              <span class="text-xs text-slate-400">被引用数: ${item.citeCount}回</span>
+              <span class="text-xs text-slate-400 font-bold">被引用数: ${item.citeCount}回</span>
             </div>
             
             <div class="flex justify-between items-start gap-4 mb-2">
               <h3 class="font-bold text-slate-900 text-base leading-snug flex-grow">${item.title}</h3>
-              <button onclick="summarizePaperOnClient(${item.id})" id="btn-sum-${item.id}" 
-                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors flex items-center space-x-1">
-                <span>✨ 要約</span>
+              <button onclick="summarizeFullTextOnClient(${item.id})" id="btn-sum-${item.id}" 
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg whitespace-nowrap transition-colors flex items-center space-x-1 shadow-sm">
+                <span>📄 フルテキスト要約</span>
               </button>
             </div>
 
-            <p class="text-xs text-slate-600 bg-slate-50 p-3 rounded border border-slate-100 line-clamp-3 leading-relaxed mb-3">
+            <p class="text-xs text-slate-600 bg-slate-50 p-3 rounded border border-slate-100 line-clamp-2 leading-relaxed mb-3">
               ${item.abstract}
             </p>
 
-            <!-- 要約結果が挿入されるエリア -->
+            <!-- フルテキスト要約結果エリア -->
             <div id="ai-summary-result-${item.id}" class="hidden my-3"></div>
 
             <div class="text-right">
-              <a href="${item.url}" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline">論文の原文を開く ↗</a>
+              <a href="${item.url}" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline">論文の原文・PDFページを開く ↗</a>
             </div>
           </div>
         `).join('');
 
+        if (isLoadMore) {
+          grid.insertAdjacentHTML('beforeend', htmlToAppend);
+        } else {
+          grid.innerHTML = htmlToAppend;
+        }
+
+        loadMoreContainer.classList.remove('hidden');
+
       } catch (err) {
         console.error(err);
         loading.classList.add('hidden');
-        grid.innerHTML = `
-          <div class="bg-red-50 text-red-700 p-4 rounded-xl text-center text-sm border border-red-200">
-            検索エラーが発生しました (${err.message})。<br>
-            検索キーワードを英語（例: memory, sleep）にするか、検索エンジンを「OpenAlex」に切り替えてお試しください。
-          </div>
-        `;
+        if (btnLoadMore) {
+          btnLoadMore.innerText = "＋ もっと検索する (さらに10件追加)";
+          btnLoadMore.disabled = false;
+        }
+        alert(`検索エラーが発生しました: ${err.message}`);
       }
     }
 
-    // 「要約」ボタンが押された時の即時AI要約処理
-    async function summarizePaperOnClient(paperId) {
+    // ★フルテキスト（論文全文）データを取得してGeminiで要約する処理
+    async function summarizeFullTextOnClient(paperId) {
       const paper = liveSearchResults.find(p => p.id === paperId);
       if (!paper) return;
 
-      // Gemini API Keyの取得 (保存されていない場合は入力を求める)
       let apiKey = localStorage.getItem('user_gemini_key');
       if (!apiKey) {
-        apiKey = prompt("リアルタイム要約を行うために、Google Gemini API Keyを入力してください（ブラウザ内に安全に保存されます）:");
+        apiKey = prompt("フルテキスト解析用に Google Gemini API Key を入力してください（ブラウザ内に安全に保存されます）:");
         if (!apiKey) return;
         localStorage.setItem('user_gemini_key', apiKey);
       }
@@ -406,21 +477,45 @@
       const resultDiv = document.getElementById(`ai-summary-result-${paperId}`);
 
       btn.disabled = true;
-      btn.innerHTML = `<span>⏳ 要約中...</span>`;
+      btn.innerHTML = `<span>⏳ 全文取得＆解析中...</span>`;
 
       try {
+        // 1. Jina Reader API を利用して論文全文（またはWEBページ全文）のテキストを取得
+        const jinaUrl = `https://r.jina.ai/${paper.fullTextUrl}`;
+        let fullTextContent = "";
+
+        try {
+          const fetchRes = await fetch(jinaUrl);
+          if (fetchRes.ok) {
+            fullTextContent = await fetchRes.text();
+          }
+        } catch (e) {
+          console.warn("フルテキスト直接取得失敗、概要フォールバック:", e);
+        }
+
+        // フルテキストが取れなかった場合はアブストラクト＋タイトルで補完
+        if (!fullTextContent || fullTextContent.length < 200) {
+          fullTextContent = `タイトル: ${paper.title}\n概要データ: ${paper.abstract}`;
+        } else {
+          // テキスト長制限（先頭30,000文字まで抽出してGeminiへ渡す）
+          fullTextContent = fullTextContent.substring(0, 30000);
+        }
+
+        // 2. Gemini API 呼び出し（フルテキスト解析）
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
         const promptText = `
-以下の心理学論文を初心者向けに超わかりやすく日本語要約してください。
+あなたは心理学の専門家です。以下に提供された心理学論文の「フルテキスト本文データ」を熟読・解析し、概要（アブストラクト）だけでは分からない具体的な実験内容や詳細な知見を初心者向けに解説してください。
 
-タイトル: ${paper.title}
-アブストラクト: ${paper.abstract}
+【論文本文データ】:
+${fullTextContent}
 
-出力フォーマット(JSON形式のみ):
+【出力指示】:
+必ず以下のJSON形式のみを出力してください。
 {
-  "summary": "中学生でもわかる1文まとめ",
-  "findings": "何がわかったのか",
-  "application": "日常でどう活かせるか"
+  "full_summary": "本文全体から読み取れる要約（中学生でもわかるように3文程度で）",
+  "method_details": "具体的な実験・調査方法・なぜこの研究を行ったのかという背景（対象人数や実験で何をしたか）",
+  "key_findings": "本文に書かれた具体的な結果・データ・数値的知見",
+  "practical_application": "日常や仕事で今すぐ使える具体アクション"
 }
 `;
 
@@ -433,27 +528,27 @@
           })
         });
 
-        if (!res.ok) throw new Error("APIキーが無効か、通信エラーが発生しました。");
+        if (!res.ok) throw new Error("APIキーが無効か、送信エラーが発生しました。");
         const resData = await res.json();
         const aiJson = JSON.parse(resData.candidates[0].content.parts[0].text);
 
         resultDiv.classList.remove('hidden');
         resultDiv.innerHTML = `
           <div class="bg-indigo-50 border border-indigo-200 p-4 rounded-lg text-xs space-y-2 text-slate-800">
-            <p class="font-bold text-indigo-900 text-sm">💡 初心者向けAI要約結果</p>
-            <p><strong>【超要約】</strong> ${aiJson.summary}</p>
-            <p><strong>【わかったこと】</strong> ${aiJson.findings}</p>
-            <p><strong>【日常での使いどころ】</strong> ${aiJson.application}</p>
+            <p class="font-bold text-indigo-900 text-sm border-b border-indigo-200 pb-1">📖 論文フルテキスト（全文）AI解析結果</p>
+            <p><strong>【全文要約】</strong> ${aiJson.full_summary}</p>
+            <p><strong>【実験・調査方法】</strong> ${aiJson.method_details}</p>
+            <p><strong>【判明した詳細結果】</strong> ${aiJson.key_findings}</p>
+            <p><strong>【日常での活用方法】</strong> ${aiJson.practical_application}</p>
           </div>
         `;
 
-        btn.innerHTML = `<span>済</span>`;
+        btn.innerHTML = `<span>解析完了</span>`;
         btn.classList.replace('bg-indigo-600', 'bg-emerald-600');
       } catch (err) {
-        alert("要約エラー: " + err.message);
+        alert("フルテキスト解析エラー: " + err.message);
         btn.disabled = false;
-        btn.innerHTML = `<span>✨ 要約</span>`;
-        // エラー時はキーを再入力できるようにクリア可能にする
+        btn.innerHTML = `<span>📄 フルテキスト要約</span>`;
         if (confirm("APIキーを再設定しますか？")) {
           localStorage.removeItem('user_gemini_key');
         }
