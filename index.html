@@ -1,1 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>心理学論文 AI要約ラボ</title>
+  <!-- Tailwind CSS (デザイン用CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Noto Sans JP', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
+  <!-- ヘッダー -->
+  <header class="bg-indigo-600 text-white shadow-md">
+    <div class="max-w-5xl mx-auto px-4 py-8">
+      <div class="flex items-center space-x-3 mb-2">
+        <span class="text-3xl">🧠</span>
+        <h1 class="text-2xl sm:text-3xl font-bold">心理学論文 AI要約ラボ</h1>
+      </div>
+      <p class="text-indigo-100 text-sm sm:text-base">最新の心理学研究をAIがわかりやすく解説。日常に活かせる知見を毎日お届けします。</p>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-5xl mx-auto px-4 py-8 flex-grow w-full">
+
+    <!-- 検索 & フィルターエリア -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-8">
+      <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+        
+        <!-- 検索バー -->
+        <div class="relative w-full md:w-96">
+          <input type="text" id="searchInput" placeholder="キーワードで検索 (例: 記憶、睡眠、モチベーション)..." 
+            class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm">
+          <svg class="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </div>
+
+        <!-- カテゴリフィルター -->
+        <div class="flex items-center space-x-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0" id="categoryFilterContainer">
+          <!-- JSで自動生成 -->
+        </div>
+
+      </div>
+
+      <!-- 論文カウント -->
+      <div class="mt-4 text-xs sm:text-sm text-slate-500 flex justify-between items-center border-t border-slate-100 pt-3">
+        <span id="resultCount">読み込み中...</span>
+        <span>更新形式: 自動更新 (GitHub Actions)</span>
+      </div>
+    </div>
+
+    <!-- 論文カード一覧表示エリア -->
+    <div id="paperGrid" class="grid grid-cols-1 gap-6">
+      <!-- JSで動的に追加されます -->
+    </div>
+
+    <!-- 該当なしメッセージ -->
+    <div id="noResults" class="hidden text-center py-16">
+      <p class="text-4xl mb-3">🔍</p>
+      <p class="text-slate-600 font-medium">条件に合う論文が見つかりませんでした。</p>
+      <p class="text-slate-400 text-sm mt-1">検索ワードを変えるか、カテゴリを「すべて」に戻してください。</p>
+    </div>
+
+  </main>
+
+  <!-- フッター -->
+  <footer class="bg-slate-800 text-slate-400 py-6 mt-12">
+    <div class="max-w-5xl mx-auto px-4 text-center text-xs space-y-2">
+      <p>当サイトの解説文はOpenAlex APIから取得した論文情報をもとにGoogle Gemini APIにて自動生成されています。</p>
+      <p>&copy; 心理学論文 AI要約ラボ - Generated with GitHub Pages</p>
+    </div>
+  </footer>
+
+  <!-- JavaScript制御スクリプト -->
+  <script>
+    let allPapers = [];
+    let currentCategory = 'ALL';
+
+    // 1. JSONデータの読み込み
+    async function loadPapers() {
+      try {
+        const response = await fetch('data/papers.json');
+        if (!response.ok) throw new Error('Data load failed');
+        allPapers = await response.json();
+        
+        setupCategoryFilters();
+        renderPapers();
+      } catch (error) {
+        console.error('Error loading papers:', error);
+        document.getElementById('paperGrid').innerHTML = `
+          <div class="bg-amber-50 border border-amber-200 text-amber-800 p-6 rounded-xl text-center">
+            <p class="font-bold mb-1">論文データが見つかりません</p>
+            <p class="text-sm">まだ自動更新スクリプトが実行されていないか、<code>data/papers.json</code> が空の可能性があります。</p>
+          </div>
+        `;
+        document.getElementById('resultCount').textContent = '掲載数: 0 件';
+      }
+    }
+
+    // 2. カテゴリフィルターボタンの自動作成
+    function setupCategoryFilters() {
+      const categories = ['ALL', ...new Set(allPapers.map(p => p.category || '未分類'))];
+      const container = document.getElementById('categoryFilterContainer');
+      
+      container.innerHTML = categories.map(cat => {
+        const label = cat === 'ALL' ? 'すべて' : cat;
+        return `
+          <button onclick="filterCategory('${cat}')" 
+            class="cat-btn text-xs sm:text-sm px-3 py-1.5 rounded-full border whitespace-nowrap transition-colors duration-200
+            ${cat === 'ALL' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}"
+            data-category="${cat}">
+            ${label}
+          </button>
+        `;
+      }).join('');
+    }
+
+    // 3. カテゴリ切り替え
+    function filterCategory(cat) {
+      currentCategory = cat;
+      document.querySelectorAll('.cat-btn').forEach(btn => {
+        if (btn.dataset.category === cat) {
+          btn.className = 'cat-btn text-xs sm:text-sm px-3 py-1.5 rounded-full border whitespace-nowrap bg-indigo-600 text-white border-indigo-600';
+        } else {
+          btn.className = 'cat-btn text-xs sm:text-sm px-3 py-1.5 rounded-full border whitespace-nowrap bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
+        }
+      });
+      renderPapers();
+    }
+
+    // 4. 検索＆フィルタリング描画
+    function renderPapers() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      
+      const filtered = allPapers.filter(paper => {
+        const matchesCategory = currentCategory === 'ALL' || (paper.category || '未分類') === currentCategory;
+        const searchTarget = `${paper.title} ${paper.summary} ${paper.background} ${paper.findings} ${paper.application} ${paper.original_title}`.toLowerCase();
+        const matchesQuery = searchTarget.includes(query);
+        return matchesCategory && matchesQuery;
+      });
+
+      // カウント表示
+      document.getElementById('resultCount').textContent = `表示中: ${filtered.length} / 全 ${allPapers.length} 件`;
+
+      const grid = document.getElementById('paperGrid');
+      const noResults = document.getElementById('noResults');
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '';
+        noResults.classList.remove('hidden');
+        return;
+      }
+
+      noResults.classList.add('hidden');
+
+      // カード描画
+      grid.innerHTML = filtered.map(paper => `
+        <article class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
+          
+          <!-- カードヘッダー -->
+          <div class="p-5 sm:p-6 border-b border-slate-100">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <span class="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1 rounded-md font-medium border border-indigo-100">
+                ${paper.category || '心理学一般'}
+              </span>
+              <span class="text-xs text-slate-400">
+                掲載日: ${paper.added_at ? paper.added_at.split(' ')[0] : '不明'}
+              </span>
+            </div>
+            <h2 class="text-lg sm:text-xl font-bold text-slate-900 leading-snug mb-2">
+              ${paper.title}
+            </h2>
+            <p class="text-xs text-slate-400 italic line-clamp-1">
+              原題: ${paper.original_title}
+            </p>
+          </div>
+
+          <!-- 要約ハイライト -->
+          <div class="bg-indigo-50/50 px-5 sm:px-6 py-3 border-b border-slate-100 text-sm text-indigo-950 font-medium leading-relaxed">
+            💡 <strong>要点:</strong> ${paper.summary}
+          </div>
+
+          <!-- 詳細コンテンツ -->
+          <div class="p-5 sm:p-6 space-y-4 text-sm text-slate-700">
+            <div>
+              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">
+                ❓ 研究の背景
+              </h3>
+              <p class="leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">${paper.background}</p>
+            </div>
+
+            <div>
+              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">
+                🧪 わかったこと
+              </h3>
+              <p class="leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">${paper.findings}</p>
+            </div>
+
+            <div>
+              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">
+                🌱 日常への活用アイデア
+              </h3>
+              <p class="leading-relaxed bg-emerald-50 text-emerald-950 p-3 rounded-lg border border-emerald-100">${paper.application}</p>
+            </div>
+          </div>
+
+          <!-- フッター（原文リンク） -->
+          <div class="bg-slate-50 px-5 sm:px-6 py-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-400">発行年: ${paper.publication_date || '不明'}</span>
+            ${paper.url ? `
+              <a href="${paper.url}" target="_blank" rel="noopener noreferrer" 
+                class="inline-flex items-center text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+                原著論文を読む (外部) 
+                <svg class="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+              </a>
+            ` : ''}
+          </div>
+
+        </article>
+      `).join('');
+    }
+
+    // リアルタイム検索イベント
+    document.getElementById('searchInput').addEventListener('input', renderPapers);
+
+    // 初期化実行
+    loadPapers();
+  </script>
+</body>
+</html>
