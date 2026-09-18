@@ -131,30 +131,49 @@ html {
 }
 
 /* ==========================================================================
-   ダークモード拡張スタイル
+   ダークモード指定（完全黒背景・白文字 / 検索ボックスは白背景・黒文字）
    ========================================================================== */
 html.dark body {
-  background-color: #0F172A;
-  color: #CBD5E1;
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
 }
 
+/* カード・コンテンツ枠の黒化 */
 html.dark article,
-html.dark .bg-white {
-  background-color: #1E293B !important;
-  border-color: #334155 !important;
-  color: #F1F5F9;
+html.dark .bg-white,
+html.dark #sectionDb > div,
+html.dark #sectionLive > div {
+  background-color: #121212 !important;
+  border-color: #2A2A2A !important;
+  color: #FFFFFF !important;
 }
 
-html.dark input[type="text"] {
-  background-color: #334155;
-  color: #FFFFFF;
-  border-color: #475569;
+/* テキストカラーの白統一 */
+html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark p, html.dark span, html.dark label {
+  color: #FFFFFF !important;
+}
+html.dark .text-slate-400, html.dark .text-slate-500, html.dark .text-slate-600 {
+  color: #A0A0A0 !important;
 }
 
-html.dark ::-webkit-scrollbar-track {
-  background: #0F172A;
+/* 検索ボックス・ドロップダウン：背景白・文字黒 */
+html.dark input[type="text"],
+html.dark select {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  border-color: #CCCCCC !important;
+  font-weight: 500;
 }
 
-html.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
+html.dark input[type="text"]::placeholder {
+  color: #666666 !important;
+}
+
+/* 内側要素の背景色調整 */
+html.dark .bg-slate-50,
+html.dark .bg-indigo-50\/50,
+html.dark .bg-emerald-50,
+html.dark .bg-purple-50 {
+  background-color: #1E1E1E !important;
+  border-color: #333333 !important;
 }
