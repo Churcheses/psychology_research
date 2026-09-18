@@ -66,15 +66,15 @@ def fetch_psychology_paper(existing_ids):
     return None
 
 def summarize_with_gemini(title, abstract):
-    """Gemini APIを呼び出して論文を日本語でわかりやすく解説する"""
+    """Gemini APIを呼び出して、初心者向け解説・具体的活用・複数論文に通底する知見を作成する"""
     if not GEMINI_API_KEY:
         print("エラー: GEMINI_API_KEYが設定されていません。")
         return None
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
-以下の心理学論文の情報をもとに、一般の読者が興味を持って読めるWebサイト向けの日本語解説記事を作成してください。
+以下の心理学論文の情報をもとに、専門知識がない初心者や中学生でも一目で理解できるようにわかりやすく解説記事を作成してください。
 
 【論文タイトル】
 {title}
@@ -83,15 +83,18 @@ def summarize_with_gemini(title, abstract):
 {abstract}
 
 【出力条件】
+専門用語は避け、身近な例え話や比喩を使ってください。
 必ず以下のJSONフォーマットのみを出力してください（Markdownの ```json 枠などは含めないでください）。
 
 {{
-  "title": "親しみやすく読者の興味を惹く日本語タイトル（30文字以内）",
-  "summary": "この記事の要点（2〜3文で簡潔に）",
-  "background": "なぜこの研究が行われたのか（背景や疑問）",
-  "findings": "実験・調査で何がわかったのか（主な発見）",
-  "application": "この知識を日常や仕事にどう活かせるか（実践的なアイデア）",
-  "category": "関連分野（例：認知心理学、社会心理学、行動心理学、恋愛心理学などから1つ）"
+  "title": "初心者でも惹かれる日本語タイトル（30文字以内）",
+  "summary": "超要約（心理学専攻者に1文のまとめ/ユーモアを持たせる）",
+  "background": "なぜこの研究をしたのか（日常生活の身近な疑問に例えて説明）",
+  "findings": "何がわかったのか（難しい数値を使わず直感的に説明）",
+  "overall_insight": "【複数論文の横断知見】この研究だけでなく、関連する心理学全般から言える総合的な知見や共通テーマ",
+  "application_scene": "日常で活かせる具体的な場面（例：朝の勉強中、仕事でミスした直後、人間関係で悩んだ時，上手くいかなくて落ち込んだ時など）",
+  "application_action": "具体的な行動手順（例：「まず〜し、次に〜する」といった実践ステップ）",
+  "category": "カテゴリ（認知心理学、行動心理学、社会心理学、メンタルヘルスなどから1つ）"
 }}
 """
 
