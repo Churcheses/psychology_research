@@ -574,7 +574,7 @@
           const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
           const promptText = `あなたは心理学の魅力を伝えるプロのサイエンスライターです。この論文PDFの「全文」を解読し、読者の興味を惹きつける最高に面白い解説を作成してください。
 
-必ず以下のJSONフォーマットのみで出力してください（Markdownの ```json 枠などは含めないでください）。
+必ず以下のJSONフォーマットのみで出力してください。
 
 {
   "title": "読者を惹きつけるキャッチーな日本語タイトル（20文字以内）",
@@ -603,7 +603,14 @@
 
           if (!res.ok) throw new Error("PDFの解析に失敗しました。APIキーを確認してください。");
           const resData = await res.json();
-          const aiJson = JSON.parse(resData.candidates[0].content.parts[0].text);
+          
+          // 2. 返ってきたテキストの抽出と安全なJSON化処理
+          let rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!rawText) throw new Error("AIから応答を取得できませんでした。");
+
+          // 余計なマークダウン枠を取り除いてパース
+          rawText = rawText.replace(/```json\s*|```/g, '').trim();
+          const aiJson = JSON.parse(rawText);
 
           renderSummaryResultUI(paperId, aiJson);
           btn.innerHTML = `<span>PDF解析完了</span>`;
@@ -632,7 +639,7 @@
       btn.innerHTML = `<span>⏳ AI要約生成中...</span>`;
 
       try {
-        const url = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
         const promptText = `あなたは心理学の魅力を伝えるプロのサイエンスライターです。心理学論文「${title}」のフルテキストを熟読し、読者の興味を惹きつける最高に面白い解説を作成してください。
 
 【本文データ】:
