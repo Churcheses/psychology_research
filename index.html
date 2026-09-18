@@ -18,14 +18,20 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-  <!-- ヘッダー -->
-  <header class="bg-indigo-600 text-white shadow-md">
-    <div class="max-w-5xl mx-auto px-4 py-8">
-      <div class="flex items-center space-x-3 mb-2">
-        <span class="text-3xl">🧠</span>
-        <h1 class="text-2xl sm:text-3xl font-bold">心理学論文 AI要約＆サーチポータル</h1>
+<!-- ヘッダー -->
+  <header class="bg-indigo-600 dark:bg-slate-900 text-white shadow-md transition-colors duration-300">
+    <div class="max-w-5xl mx-auto px-4 py-8 flex justify-between items-center">
+      <div>
+        <div class="flex items-center space-x-3 mb-2">
+          <span class="text-3xl">🧠</span>
+          <h1 class="text-2xl sm:text-3xl font-bold">心理学論文 AI要約＆サーチポータル</h1>
+        </div>
+        <p class="text-indigo-100 dark:text-slate-400 text-sm sm:text-base">最新の心理学研究を初心者にもわかりやすく解説。日常で使える実践知識へ。</p>
       </div>
-      <p class="text-indigo-100 text-sm sm:text-base">自動蓄積されたAI要約論文の閲覧と、世界中の心理学論文のリアルタイム検索が可能です。</p>
+      <!-- ダークモード切り替えボタン -->
+      <button onclick="toggleDarkMode()" class="p-2.5 bg-indigo-700 dark:bg-slate-800 hover:bg-indigo-800 dark:hover:bg-slate-700 rounded-lg text-lg transition-colors border border-indigo-500 dark:border-slate-700" title="ダークモード切り替え">
+        <span id="themeIcon">🌙</span>
+      </button>
     </div>
   </header>
 
@@ -77,14 +83,34 @@
 
     <!-- ==================== TAB 2: ライブ論文サーチ ==================== -->
     <div id="sectionLive" class="hidden">
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-8">
-        <p class="text-xs sm:text-sm text-slate-600 mb-3">
-          世界最大の学術データベース「OpenAlex」から、心理学分野の論文をリアルタイムで検索します（英語キーワードが効果的です）。
-        </p>
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 sm:p-6 mb-8 transition-colors">
+        
+        <!-- オプション選択エリア（サイト選択・専門用語ドロップダウン） -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <!-- サーチするサイトの選択 -->
+          <div>
+            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">🔍 検索エンジンを選択</label>
+            <select id="searchEngineSelect" class="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700 dark:text-white">
+              <option value="openalex">OpenAlex (全世界の学術論文DB)</option>
+              <option value="semanticscholar">Semantic Scholar (AI搭載・AI心理学DB)</option>
+            </select>
+          </div>
+
+          <!-- 専門用語（サーチワード）の選択 -->
+          <div>
+            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">📚 心理学の専門用語から選択</label>
+            <select id="termSelect" onchange="applySelectedTerm(this.value)" class="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700 dark:text-white">
+              <option value="">-- 専門用語を選んで自動入力 --</option>
+              <!-- JavaScriptで自動挿入されます -->
+            </select>
+          </div>
+        </div>
+
+        <!-- 検索入力バー -->
         <div class="flex gap-2">
           <div class="relative flex-grow">
-            <input type="text" id="liveSearchInput" placeholder="英語のキーワードを入力 (例: memory, emotion, social psychology, sleep)..." 
-              class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            <input type="text" id="liveSearchInput" placeholder="英語のキーワードまたは専門用語を選択..." 
+              class="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
             <svg class="w-5 h-5 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
             </svg>
@@ -116,6 +142,52 @@
 
   <!-- スクリプト定義 -->
   <script>
+    const PSYCHOLOGY_TERMS = [
+      { label: "認知バイアス (Cognitive Bias)", query: "cognitive bias" },
+      { label: "ワーキングメモリ / 記憶 (Working Memory)", query: "working memory" },
+      { label: "古典的条件付け (Classical Conditioning)", query: "classical conditioning" },
+      { label: "神経可塑性 (Neuroplasticity)", query: "neuroplasticity" },
+      { label: "自己効力感 (Self-Efficacy)", query: "self efficacy" },
+      { label: "マインドフルネス (Mindfulness)", query: "mindfulness" },
+      { label: "社会的証明 (Social Proof)", query: "social proof" },
+      { label: "認知の再評価 / 感情調節 (Cognitive Reappraisal)", query: "cognitive reappraisal" },
+      { label: "インポスター症候群 (Impostor Phenomenon)", query: "impostor phenomenon" },
+      { label: "モチベーション / 内発的動機 (Intrinsic Motivation)", query: "intrinsic motivation" }
+    ];
+
+    // ダークモード切替処理
+    function toggleDarkMode() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      document.getElementById('themeIcon').textContent = isDark ? '☀️' : '🌙';
+    }
+
+    // 初期表示時のダークモード＆専門用語ドロップダウンのロード
+    function initSettings() {
+      if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+        const icon = document.getElementById('themeIcon');
+        if (icon) icon.textContent = '☀️';
+      }
+      
+      const termSelect = document.getElementById('termSelect');
+      if (termSelect) {
+        PSYCHOLOGY_TERMS.forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.query;
+          opt.textContent = item.label;
+          termSelect.appendChild(opt);
+        });
+      }
+    }
+    document.addEventListener('DOMContentLoaded', initSettings);
+
+    function applySelectedTerm(val) {
+      if (val) {
+        document.getElementById('liveSearchInput').value = val;
+        executeLiveSearch();
+      }
+    }
     let allPapers = [];
     let currentCategory = 'ALL';
 
@@ -213,47 +285,49 @@
       noResults.classList.add('hidden');
 
       grid.innerHTML = filtered.map(paper => `
-        <article class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
-          <div class="p-5 sm:p-6 border-b border-slate-100">
-            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <span class="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1 rounded-md font-medium border border-indigo-100">
-                ${paper.category || '心理学一般'}
-              </span>
-              <span class="text-xs text-slate-400">掲載日: ${paper.added_at ? paper.added_at.split(' ')[0] : '不明'}</span>
-            </div>
-            <h2 class="text-lg sm:text-xl font-bold text-slate-900 leading-snug mb-2">${paper.title}</h2>
-            <p class="text-xs text-slate-400 italic line-clamp-1">原題: ${paper.original_title}</p>
+        <!-- 超要約 -->
+          <div class="bg-indigo-50/70 dark:bg-slate-800 px-5 sm:px-6 py-3 border-b border-slate-100 dark:border-slate-700 text-sm text-indigo-950 dark:text-indigo-200 font-medium leading-relaxed">
+            💡 <strong>超要約:</strong> ${paper.summary}
           </div>
-          <div class="bg-indigo-50/50 px-5 sm:px-6 py-3 border-b border-slate-100 text-sm text-indigo-950 font-medium leading-relaxed">
-            💡 <strong>要点:</strong> ${paper.summary}
-          </div>
-          <div class="p-5 sm:p-6 space-y-4 text-sm text-slate-700">
+
+          <!-- 詳細コンテンツ -->
+          <div class="p-5 sm:p-6 space-y-4 text-sm text-slate-700 dark:text-slate-300">
             <div>
-              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">❓ 研究の背景</h3>
-              <p class="leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">${paper.background}</p>
+              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400">❓ なぜ研究したの？（背景）</h3>
+              <p class="leading-relaxed bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700">${paper.background}</p>
             </div>
+
             <div>
-              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">🧪 わかったこと</h3>
-              <p class="leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">${paper.findings}</p>
+              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400">🧪 何がわかったの？（結論）</h3>
+              <p class="leading-relaxed bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700">${paper.findings}</p>
             </div>
+
+            <!-- ★複数論文の横断知見 -->
+            ${paper.overall_insight ? `
             <div>
-              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">🌱 日常への活用アイデア</h3>
-              <p class="leading-relaxed bg-emerald-50 text-emerald-950 p-3 rounded-lg border border-emerald-100">${paper.application}</p>
+              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-1 text-xs uppercase tracking-wider text-purple-600 dark:text-purple-400">🌐 複数研究から言える総合知見</h3>
+              <p class="leading-relaxed bg-purple-50 dark:bg-purple-950/30 text-purple-950 dark:text-purple-200 p-3 rounded-lg border border-purple-100 dark:border-purple-900/50">${paper.overall_insight}</p>
+            </div>
+            ` : ''}
+
+            <!-- ★日常での具体活用（場面とアクション） -->
+            <div>
+              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-1 text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400">🌱 日常での具体的な使いどころ</h3>
+              <div class="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-200 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/50 space-y-2">
+                <p><strong>【使いたい場面】</strong> ${paper.application_scene || paper.application || '日常のあらゆる場面'}</p>
+                <p><strong>【具体アクション】</strong> ${paper.application_action || '研究結果を意識して行動してみましょう。'}</p>
+              </div>
             </div>
           </div>
-          <div class="bg-slate-50 px-5 sm:px-6 py-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span class="text-slate-400">発行年: ${paper.publication_date || '不明'}</span>
-            ${paper.url ? `<a href="${paper.url}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium">原著論文を読む (外部) ↗</a>` : ''}
-          </div>
-        </article>
       `).join('');
     }
 
-    // 2. OpenAlex APIによるライブ論文サーチ
+// 2. 選択されたエンジン（OpenAlex / Semantic Scholar）でのライブ論文サーチ
     async function executeLiveSearch() {
       const keyword = document.getElementById('liveSearchInput').value.trim();
       if (!keyword) return;
 
+      const engine = document.getElementById('searchEngineSelect').value;
       const loading = document.getElementById('liveLoading');
       const grid = document.getElementById('liveResultsGrid');
 
@@ -261,67 +335,76 @@
       grid.innerHTML = '';
 
       try {
-        // OpenAlex API 呼び出し (心理学コンセプト: C15744967)
-        const url = `https://api.openalex.org/works?search=${encodeURIComponent(keyword)}&filter=concepts.id:C15744967,has_abstract:true&per-page=10`;
-        const res = await fetch(url);
-        const data = await res.json();
-        
+        let results = [];
+
+        if (engine === 'openalex') {
+          // OpenAlex API
+          const url = `[https://api.openalex.org/works?search=$](https://api.openalex.org/works?search=$){encodeURIComponent(keyword)}&filter=concepts.id:C15744967,has_abstract:true&per-page=10`;
+          const res = await fetch(url);
+          const data = await res.json();
+          results = (data.results || []).map(item => {
+            let abstractText = "アブストラクト情報なし";
+            if (item.abstract_inverted_index) {
+              const wordPositions = [];
+              for (const [word, positions] of Object.entries(item.abstract_inverted_index)) {
+                for (const pos of positions) wordPositions.push([pos, word]);
+              }
+              wordPositions.sort((a, b) => a[0] - b[0]);
+              abstractText = wordPositions.map(x => x[1]).join(' ');
+            }
+            return {
+              title: item.title,
+              year: item.publication_year || '不明',
+              citeCount: item.cited_by_count || 0,
+              abstract: abstractText,
+              url: item.doi || item.id,
+              source: 'OpenAlex'
+            };
+          });
+        } else {
+          // Semantic Scholar API
+          const url = `[https://api.semanticscholar.org/graph/v1/paper/search?query=$](https://api.semanticscholar.org/graph/v1/paper/search?query=$){encodeURIComponent(keyword)}&limit=10&fields=title,abstract,year,citationCount,url`;
+          const res = await fetch(url);
+          const data = await res.json();
+          results = (data.data || []).map(item => ({
+            title: item.title,
+            year: item.year || '不明',
+            citeCount: item.citationCount || 0,
+            abstract: item.abstract || "アブストラクト情報なし",
+            url: item.url,
+            source: 'Semantic Scholar'
+          }));
+        }
+
         loading.classList.add('hidden');
 
-        if (!data.results || data.results.length === 0) {
-          grid.innerHTML = `
-            <div class="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500">
-              「${keyword}」に一致する心理学論文が見つかりませんでした。別の英語キーワードで検索してみてください。
-            </div>
-          `;
+        if (results.length === 0) {
+          grid.innerHTML = `<div class="bg-white dark:bg-slate-800 p-8 rounded-xl border border-slate-200 dark:border-slate-700 text-center text-slate-500 dark:text-slate-400">該当する論文が見つかりませんでした。</div>`;
           return;
         }
 
-        grid.innerHTML = data.results.map(item => {
-          // Abstract復元
-          let abstractText = "アブストラクト情報なし";
-          if (item.abstract_inverted_index) {
-            const wordPositions = [];
-            for (const [word, positions] of Object.entries(item.abstract_inverted_index)) {
-              for (const pos of positions) wordPositions.push([pos, word]);
-            }
-            wordPositions.sort((a, b) => a[0] - b[0]);
-            abstractText = wordPositions.map(x => x[1]).join(' ');
-          }
-
-          const paperUrl = item.doi || item.id;
-          const authors = item.authorships ? item.authorships.slice(0, 3).map(a => a.author.display_name).join(', ') : '著者不明';
-
-          return `
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-indigo-200 transition-colors">
-              <div class="flex justify-between items-start gap-2 mb-2">
-                <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                  ${item.publication_year || '年不明'}
-                </span>
-                <span class="text-xs text-slate-400">被引用数: ${item.cited_by_count || 0}回</span>
-              </div>
-              <h3 class="font-bold text-slate-900 text-base mb-1">${item.title}</h3>
-              <p class="text-xs text-slate-500 mb-3">著者: ${authors}</p>
-              <p class="text-xs text-slate-600 bg-slate-50 p-3 rounded border border-slate-100 line-clamp-4 leading-relaxed">
-                ${abstractText}
-              </p>
-              <div class="mt-3 text-right">
-                <a href="${paperUrl}" target="_blank" class="inline-block text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                  論文の原文ページを開く (外部) ↗
-                </a>
-              </div>
+        grid.innerHTML = results.map(item => `
+          <div class="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+            <div class="flex justify-between items-start gap-2 mb-2">
+              <span class="text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">
+                ${item.source} (${item.year})
+              </span>
+              <span class="text-xs text-slate-400">被引用数: ${item.citeCount}回</span>
             </div>
-          `;
-        }).join('');
+            <h3 class="font-bold text-slate-900 dark:text-white text-base mb-1">${item.title}</h3>
+            <p class="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded border border-slate-100 dark:border-slate-700 line-clamp-4 leading-relaxed">
+              ${item.abstract}
+            </p>
+            <div class="mt-3 text-right">
+              <a href="${item.url}" target="_blank" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">論文の原文を開く ↗</a>
+            </div>
+          </div>
+        `).join('');
 
       } catch (err) {
         console.error(err);
         loading.classList.add('hidden');
-        grid.innerHTML = `
-          <div class="bg-red-50 text-red-700 p-4 rounded-xl text-center text-sm">
-            検索中にエラーが発生しました。時間を置いて再度お試しください。
-          </div>
-        `;
+        grid.innerHTML = `<div class="bg-red-50 text-red-700 p-4 rounded-xl text-center text-sm">検索エラーが発生しました。</div>`;
       }
     }
 
