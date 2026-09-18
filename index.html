@@ -670,17 +670,43 @@ ${textContent}
       }
     }
 
-    // 解析結果のカード描画関数
+  // 解析結果のカード描画関数
     function renderSummaryResultUI(paperId, aiJson) {
       const resultDiv = document.getElementById(`ai-summary-result-${paperId}`);
       resultDiv.classList.remove('hidden');
       resultDiv.innerHTML = `
-        <div class="bg-indigo-50 dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 p-4 rounded-lg text-xs space-y-2 text-slate-800 dark:text-slate-200">
-          <p class="font-bold text-indigo-900 dark:text-indigo-300 text-sm border-b border-indigo-200 dark:border-slate-700 pb-1">📖 論文フルテキスト（全文）AI解析結果</p>
-          <p><strong>【全文要約】</strong> ${aiJson.full_summary}</p>
-          <p><strong>【実験・調査方法】</strong> ${aiJson.method_details}</p>
-          <p><strong>【判明した詳細結果】</strong> ${aiJson.key_findings}</p>
-          <p><strong>【日常での活用方法】</strong> ${aiJson.practical_application}</p>
+        <div class="bg-indigo-50 dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 p-4 rounded-xl text-xs space-y-3 text-slate-800 dark:text-slate-200 shadow-inner">
+          
+          <!-- タイトル ＆ 1文要約 -->
+          <div class="border-b border-indigo-200 dark:border-slate-700 pb-2">
+            <h4 class="font-bold text-indigo-900 dark:text-indigo-300 text-sm mb-1">🔥 ${aiJson.title || '注目の心理学研究'}</h4>
+            <p class="text-xs font-semibold text-indigo-700 dark:text-indigo-400 leading-relaxed">💡 ${aiJson.catchy_summary}</p>
+          </div>
+
+          <!-- なぜ研究したの？（ユーモア解説） -->
+          <div>
+            <p class="font-bold text-slate-900 dark:text-white mb-0.5">🤣 なんでこの研究をしたの？</p>
+            <p class="leading-relaxed bg-white/70 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60">${aiJson.humorous_background}</p>
+          </div>
+
+          <!-- 判明した事実・実験内容 -->
+          <div>
+            <p class="font-bold text-slate-900 dark:text-white mb-0.5">🧪 実験で分かったリアルな結果</p>
+            <p class="leading-relaxed bg-white/70 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60">${aiJson.findings}</p>
+          </div>
+
+          <!-- 研究のオリジナリティプレゼン -->
+          <div>
+            <p class="font-bold text-purple-900 dark:text-purple-300 mb-0.5">✨ ここが面白い！オリジナリティのツボ</p>
+            <p class="leading-relaxed bg-purple-100/50 dark:bg-purple-950/30 text-purple-950 dark:text-purple-200 p-2.5 rounded-lg border border-purple-200/60 dark:border-purple-900/50">${aiJson.originality_pitch}</p>
+          </div>
+
+          <!-- 日常での活用 -->
+          <div>
+            <p class="font-bold text-emerald-900 dark:text-emerald-300 mb-0.5">🌱 日常で今すぐ使えるアクション</p>
+            <p class="leading-relaxed bg-emerald-100/50 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-200 p-2.5 rounded-lg border border-emerald-200/60 dark:border-emerald-900/50">${aiJson.practical_application}</p>
+          </div>
+
         </div>
       `;
     }
