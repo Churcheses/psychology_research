@@ -1,0 +1,2 @@
+# psychology_research
+心理学の論文を自動で収集してAIが概要についてまとめる
