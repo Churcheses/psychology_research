@@ -1,1 +1,46 @@
+name: Daily Paper Digest Generator
 
+on:
+  schedule:
+    # 毎日朝9時（日本時間）に自動実行 (UTC 0:00)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # GitHubの画面から手動でボタンを押して即時実行できるようにする設定
+
+permissions:
+  contents: write
+
+jobs:
+  run-auto-post:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. リポジトリのコードを取得
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Python環境のセットアップ
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 3. script.py の実行 (Gemini APIキーを環境変数として渡す)
+      - name: Run script
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python script.py
+
+      # 4. 更新された data/papers.json をリポジトリに自動コミット・プッシュ
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/papers.json
+          
+          # 変更がある場合のみコミット
+          if git diff --staged --quiet; then
+            echo "変更はありませんでした。"
+          else
+            git commit -m "Auto: 新しい心理学論文を追加"
+            git push
+          fi
