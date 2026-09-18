@@ -81,36 +81,22 @@
       </div>
     </div>
 
-    <!-- ==================== TAB 2: ライブ論文サーチ ==================== -->
+    <!-- TAB 2: ライブ論文サーチ -->
     <div id="sectionLive" class="hidden">
-      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 sm:p-6 mb-8 transition-colors">
-        
-        <!-- オプション選択エリア（サイト選択・専門用語ドロップダウン） -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-          <!-- サーチするサイトの選択 -->
-          <div>
-            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">🔍 検索エンジンを選択</label>
-            <select id="searchEngineSelect" class="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700 dark:text-white">
-              <option value="openalex">OpenAlex (全世界の学術論文DB)</option>
-              <option value="semanticscholar">Semantic Scholar (AI搭載・AI心理学DB)</option>
-            </select>
-          </div>
-
-          <!-- 専門用語（サーチワード）の選択 -->
-          <div>
-            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">📚 心理学の専門用語から選択</label>
-            <select id="termSelect" onchange="applySelectedTerm(this.value)" class="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700 dark:text-white">
-              <option value="">-- 専門用語を選んで自動入力 --</option>
-              <!-- JavaScriptで自動挿入されます -->
-            </select>
-          </div>
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-8">
+        <div class="mb-4">
+          <label class="block text-xs font-bold text-slate-500 mb-1">🔍 検索エンジンを選択</label>
+          <select id="searchEngineSelect" class="w-full sm:w-64 p-2 border border-slate-300 rounded-lg text-sm bg-white text-black">
+            <option value="openalex">OpenAlex (世界最大の論文DB)</option>
+            <option value="semanticscholar">Semantic Scholar (AI搭載論文DB)</option>
+          </select>
         </div>
 
         <!-- 検索入力バー -->
         <div class="flex gap-2">
           <div class="relative flex-grow">
-            <input type="text" id="liveSearchInput" placeholder="英語のキーワードまたは専門用語を選択..." 
-              class="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            <input type="text" id="liveSearchInput" placeholder="英語キーワードを入力 (例: memory, sleep, anxiety)..." 
+              class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
             <svg class="w-5 h-5 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
             </svg>
@@ -122,10 +108,10 @@
         </div>
       </div>
 
-      <!-- ライブ検索結果表示エリア -->
+      <!-- 検索結果表示エリア -->
       <div id="liveLoading" class="hidden text-center py-12">
         <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent mb-2"></div>
-        <p class="text-sm text-slate-500">OpenAlexから論文を検索中...</p>
+        <p class="text-sm text-slate-500">論文を検索中...</p>
       </div>
 
       <div id="liveResultsGrid" class="grid grid-cols-1 gap-4"></div>
@@ -142,18 +128,9 @@
 
   <!-- スクリプト定義 -->
   <script>
-    const PSYCHOLOGY_TERMS = [
-      { label: "認知バイアス (Cognitive Bias)", query: "cognitive bias" },
-      { label: "ワーキングメモリ / 記憶 (Working Memory)", query: "working memory" },
-      { label: "古典的条件付け (Classical Conditioning)", query: "classical conditioning" },
-      { label: "神経可塑性 (Neuroplasticity)", query: "neuroplasticity" },
-      { label: "自己効力感 (Self-Efficacy)", query: "self efficacy" },
-      { label: "マインドフルネス (Mindfulness)", query: "mindfulness" },
-      { label: "社会的証明 (Social Proof)", query: "social proof" },
-      { label: "認知の再評価 / 感情調節 (Cognitive Reappraisal)", query: "cognitive reappraisal" },
-      { label: "インポスター症候群 (Impostor Phenomenon)", query: "impostor phenomenon" },
-      { label: "モチベーション / 内発的動機 (Intrinsic Motivation)", query: "intrinsic motivation" }
-    ];
+    let allPapers = [];
+    let currentCategory = 'ALL';
+    let liveSearchResults = []; // 検索結果の一時保持用
 
     // ダークモード切替処理
     function toggleDarkMode() {
@@ -162,34 +139,15 @@
       document.getElementById('themeIcon').textContent = isDark ? '☀️' : '🌙';
     }
 
-    // 初期表示時のダークモード＆専門用語ドロップダウンのロード
+    // 初期化処理
     function initSettings() {
-      if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      if (localStorage.getItem('theme') === 'dark') {
         document.documentElement.classList.add('dark');
         const icon = document.getElementById('themeIcon');
         if (icon) icon.textContent = '☀️';
       }
-      
-      const termSelect = document.getElementById('termSelect');
-      if (termSelect) {
-        PSYCHOLOGY_TERMS.forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.query;
-          opt.textContent = item.label;
-          termSelect.appendChild(opt);
-        });
-      }
     }
     document.addEventListener('DOMContentLoaded', initSettings);
-
-    function applySelectedTerm(val) {
-      if (val) {
-        document.getElementById('liveSearchInput').value = val;
-        executeLiveSearch();
-      }
-    }
-    let allPapers = [];
-    let currentCategory = 'ALL';
 
     // タブ切り替え
     function switchTab(tab) {
