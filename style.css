@@ -1,0 +1,131 @@
+@charset "UTF-8";
+
+/* ==========================================================================
+   企業HP風 スタイリッシュデザイン（Custom CSS）
+   ========================================================================== */
+
+/* 全体基本設定 */
+:root {
+  --brand-primary: #3B82F6;
+  --brand-primary-dark: #1D4ED8;
+  --brand-navy: #0F172A;
+  --bg-slate: #F8FAFC;
+  --card-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  --hover-shadow: 0 20px 30px -10px rgba(59, 130, 246, 0.12), 0 10px 15px -5px rgba(15, 23, 42, 0.04);
+}
+
+body {
+  font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-slate);
+  color: #334155;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ヒーローヘッダー（高級感のあるグラデーション＆微細なグリッドパターン） */
+header {
+  background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #1E293B 100%) !important;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.15) 0px, transparent 50%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+/* タイトルアニメーション＆装飾 */
+header h1 {
+  letter-spacing: -0.02em;
+  background: linear-gradient(to right, #FFFFFF, #E2E8F0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* カード型コンテンツのエレガントなスタイル */
+article, .bg-white {
+  box-shadow: var(--card-shadow);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid #E2E8F0 !important;
+}
+
+article:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--hover-shadow) !important;
+  border-color: #CBD5E1 !important;
+}
+
+/* 検索バー・入力フィールドのスタイリッシュ化 */
+input[type="text"] {
+  transition: all 0.2s ease-in-out;
+  background-color: #F8FAFC;
+}
+
+input[type="text"]:focus {
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12) !important;
+  border-color: #6366F1 !important;
+}
+
+/* ボタン（検索・アクション） */
+button {
+  transition: all 0.2s ease-in-out !important;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* タブボタンの切り替えアニメーション */
+#tabDb, #tabLive {
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+/* バッジ・タグ（カテゴリなど） */
+span.bg-indigo-50 {
+  background-color: #EEF2FF !important;
+  color: #4338CA !important;
+  border: 1px solid #E0E7FF !important;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* 日常への活用アイデア（ハイライト枠） */
+.bg-emerald-50 {
+  background: linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%) !important;
+  border-left: 4px solid #10B981 !important;
+  border-color: #A7F3D0 !important;
+}
+
+/* スクロールバーのカスタマイズ（洗練された細めデザイン） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* スムーズスクロール */
+html {
+  scroll-behavior: smooth;
+}
