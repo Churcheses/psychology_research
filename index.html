@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>心理学論文 AI要約ラボ</title>
-  <!-- Tailwind CSS (デザイン用CDN) -->
+  <title>心理学論文 AI要約＆サーチポータル</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,70 +21,123 @@
     <div class="max-w-5xl mx-auto px-4 py-8">
       <div class="flex items-center space-x-3 mb-2">
         <span class="text-3xl">🧠</span>
-        <h1 class="text-2xl sm:text-3xl font-bold">心理学論文 AI要約ラボ</h1>
+        <h1 class="text-2xl sm:text-3xl font-bold">心理学論文 AI要約＆サーチポータル</h1>
       </div>
-      <p class="text-indigo-100 text-sm sm:text-base">最新の心理学研究をAIがわかりやすく解説。日常に活かせる知見を毎日お届けします。</p>
+      <p class="text-indigo-100 text-sm sm:text-base">自動蓄積されたAI要約論文の閲覧と、世界中の心理学論文のリアルタイム検索が可能です。</p>
     </div>
   </header>
 
   <!-- メインコンテンツ -->
   <main class="max-w-5xl mx-auto px-4 py-8 flex-grow w-full">
 
-    <!-- 検索 & フィルターエリア -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-8">
-      <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
-        
-        <!-- 検索バー -->
-        <div class="relative w-full md:w-96">
-          <input type="text" id="searchInput" placeholder="キーワードで検索 (例: 記憶、睡眠、モチベーション)..." 
-            class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm">
-          <svg class="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-          </svg>
+    <!-- モード切り替えタブ -->
+    <div class="flex border-b border-slate-200 mb-6 space-x-4">
+      <button id="tabDb" onclick="switchTab('db')" 
+        class="pb-3 px-4 text-sm sm:text-base font-bold border-b-2 border-indigo-600 text-indigo-600 flex items-center space-x-2">
+        <span>📚 蓄積済み要約カード</span>
+      </button>
+      <button id="tabLive" onclick="switchTab('live')" 
+        class="pb-3 px-4 text-sm sm:text-base font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2">
+        <span>🌐 ライブ論文サーチ (OpenAlex)</span>
+      </button>
+    </div>
+
+    <!-- ==================== TAB 1: 蓄積データベース検索 ==================== -->
+    <div id="sectionDb">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-8">
+        <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+          <!-- 検索バー -->
+          <div class="relative w-full md:w-96">
+            <input type="text" id="searchInput" placeholder="要約カード内を検索 (例: 記憶、睡眠)..." 
+              class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            <svg class="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+
+          <!-- カテゴリフィルター -->
+          <div class="flex items-center space-x-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0" id="categoryFilterContainer"></div>
         </div>
 
-        <!-- カテゴリフィルター -->
-        <div class="flex items-center space-x-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0" id="categoryFilterContainer">
-          <!-- JSで自動生成 -->
+        <div class="mt-4 text-xs sm:text-sm text-slate-500 flex justify-between items-center border-t border-slate-100 pt-3">
+          <span id="resultCount">読み込み中...</span>
+          <span>毎日自動更新中</span>
         </div>
-
       </div>
 
-      <!-- 論文カウント -->
-      <div class="mt-4 text-xs sm:text-sm text-slate-500 flex justify-between items-center border-t border-slate-100 pt-3">
-        <span id="resultCount">読み込み中...</span>
-        <span>更新形式: 自動更新 (GitHub Actions)</span>
+      <!-- カード表示エリア -->
+      <div id="paperGrid" class="grid grid-cols-1 gap-6"></div>
+      <div id="noResults" class="hidden text-center py-16">
+        <p class="text-4xl mb-3">🔍</p>
+        <p class="text-slate-600 font-medium">条件に合う要約カードが見つかりませんでした。</p>
       </div>
     </div>
 
-    <!-- 論文カード一覧表示エリア -->
-    <div id="paperGrid" class="grid grid-cols-1 gap-6">
-      <!-- JSで動的に追加されます -->
-    </div>
+    <!-- ==================== TAB 2: ライブ論文サーチ ==================== -->
+    <div id="sectionLive" class="hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-8">
+        <p class="text-xs sm:text-sm text-slate-600 mb-3">
+          世界最大の学術データベース「OpenAlex」から、心理学分野の論文をリアルタイムで検索します（英語キーワードが効果的です）。
+        </p>
+        <div class="flex gap-2">
+          <div class="relative flex-grow">
+            <input type="text" id="liveSearchInput" placeholder="英語のキーワードを入力 (例: memory, emotion, social psychology, sleep)..." 
+              class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            <svg class="w-5 h-5 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+          <button onclick="executeLiveSearch()" 
+            class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors flex items-center space-x-1 whitespace-nowrap">
+            <span>検索</span>
+          </button>
+        </div>
+      </div>
 
-    <!-- 該当なしメッセージ -->
-    <div id="noResults" class="hidden text-center py-16">
-      <p class="text-4xl mb-3">🔍</p>
-      <p class="text-slate-600 font-medium">条件に合う論文が見つかりませんでした。</p>
-      <p class="text-slate-400 text-sm mt-1">検索ワードを変えるか、カテゴリを「すべて」に戻してください。</p>
+      <!-- ライブ検索結果表示エリア -->
+      <div id="liveLoading" class="hidden text-center py-12">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent mb-2"></div>
+        <p class="text-sm text-slate-500">OpenAlexから論文を検索中...</p>
+      </div>
+
+      <div id="liveResultsGrid" class="grid grid-cols-1 gap-4"></div>
     </div>
 
   </main>
 
-  <!-- フッター -->
   <footer class="bg-slate-800 text-slate-400 py-6 mt-12">
     <div class="max-w-5xl mx-auto px-4 text-center text-xs space-y-2">
-      <p>当サイトの解説文はOpenAlex APIから取得した論文情報をもとにGoogle Gemini APIにて自動生成されています。</p>
-      <p>&copy; 心理学論文 AI要約ラボ - Generated with GitHub Pages</p>
+      <p>Data provided by OpenAlex API & Google Gemini API</p>
+      <p>&copy; 心理学論文 AI要約＆サーチポータル</p>
     </div>
   </footer>
 
-  <!-- JavaScript制御スクリプト -->
+  <!-- スクリプト定義 -->
   <script>
     let allPapers = [];
     let currentCategory = 'ALL';
 
-    // 1. JSONデータの読み込み
+    // タブ切り替え
+    function switchTab(tab) {
+      const sectionDb = document.getElementById('sectionDb');
+      const sectionLive = document.getElementById('sectionLive');
+      const tabDb = document.getElementById('tabDb');
+      const tabLive = document.getElementById('tabLive');
+
+      if (tab === 'db') {
+        sectionDb.classList.remove('hidden');
+        sectionLive.classList.add('hidden');
+        tabDb.className = "pb-3 px-4 text-sm sm:text-base font-bold border-b-2 border-indigo-600 text-indigo-600 flex items-center space-x-2";
+        tabLive.className = "pb-3 px-4 text-sm sm:text-base font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2";
+      } else {
+        sectionDb.classList.add('hidden');
+        sectionLive.classList.remove('hidden');
+        tabLive.className = "pb-3 px-4 text-sm sm:text-base font-bold border-b-2 border-indigo-600 text-indigo-600 flex items-center space-x-2";
+        tabDb.className = "pb-3 px-4 text-sm sm:text-base font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2";
+      }
+    }
+
+    // 1. JSONデータの読み込み (蓄積カード用)
     async function loadPapers() {
       try {
         const response = await fetch('data/papers.json');
@@ -97,15 +150,15 @@
         console.error('Error loading papers:', error);
         document.getElementById('paperGrid').innerHTML = `
           <div class="bg-amber-50 border border-amber-200 text-amber-800 p-6 rounded-xl text-center">
-            <p class="font-bold mb-1">論文データが見つかりません</p>
-            <p class="text-sm">まだ自動更新スクリプトが実行されていないか、<code>data/papers.json</code> が空の可能性があります。</p>
+            <p class="font-bold mb-1">蓄積論文データがまだありません</p>
+            <p class="text-sm">GitHub Actionsが初回実行されると、ここに要約カードが自動追加されます。</p>
           </div>
         `;
         document.getElementById('resultCount').textContent = '掲載数: 0 件';
       }
     }
 
-    // 2. カテゴリフィルターボタンの自動作成
+    // カテゴリフィルター作成
     function setupCategoryFilters() {
       const categories = ['ALL', ...new Set(allPapers.map(p => p.category || '未分類'))];
       const container = document.getElementById('categoryFilterContainer');
@@ -114,7 +167,7 @@
         const label = cat === 'ALL' ? 'すべて' : cat;
         return `
           <button onclick="filterCategory('${cat}')" 
-            class="cat-btn text-xs sm:text-sm px-3 py-1.5 rounded-full border whitespace-nowrap transition-colors duration-200
+            class="cat-btn text-xs sm:text-sm px-3 py-1.5 rounded-full border whitespace-nowrap transition-colors
             ${cat === 'ALL' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}"
             data-category="${cat}">
             ${label}
@@ -123,7 +176,6 @@
       }).join('');
     }
 
-    // 3. カテゴリ切り替え
     function filterCategory(cat) {
       currentCategory = cat;
       document.querySelectorAll('.cat-btn').forEach(btn => {
@@ -136,20 +188,17 @@
       renderPapers();
     }
 
-    // 4. 検索＆フィルタリング描画
+    // 蓄積カード描画
     function renderPapers() {
       const query = document.getElementById('searchInput').value.toLowerCase();
       
       const filtered = allPapers.filter(paper => {
         const matchesCategory = currentCategory === 'ALL' || (paper.category || '未分類') === currentCategory;
         const searchTarget = `${paper.title} ${paper.summary} ${paper.background} ${paper.findings} ${paper.application} ${paper.original_title}`.toLowerCase();
-        const matchesQuery = searchTarget.includes(query);
-        return matchesCategory && matchesQuery;
+        return matchesCategory && searchTarget.includes(query);
       });
 
-      // カウント表示
       document.getElementById('resultCount').textContent = `表示中: ${filtered.length} / 全 ${allPapers.length} 件`;
-
       const grid = document.getElementById('paperGrid');
       const noResults = document.getElementById('noResults');
 
@@ -161,77 +210,126 @@
 
       noResults.classList.add('hidden');
 
-      // カード描画
       grid.innerHTML = filtered.map(paper => `
-        <article class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
-          
-          <!-- カードヘッダー -->
+        <article class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
           <div class="p-5 sm:p-6 border-b border-slate-100">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
               <span class="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1 rounded-md font-medium border border-indigo-100">
                 ${paper.category || '心理学一般'}
               </span>
-              <span class="text-xs text-slate-400">
-                掲載日: ${paper.added_at ? paper.added_at.split(' ')[0] : '不明'}
-              </span>
+              <span class="text-xs text-slate-400">掲載日: ${paper.added_at ? paper.added_at.split(' ')[0] : '不明'}</span>
             </div>
-            <h2 class="text-lg sm:text-xl font-bold text-slate-900 leading-snug mb-2">
-              ${paper.title}
-            </h2>
-            <p class="text-xs text-slate-400 italic line-clamp-1">
-              原題: ${paper.original_title}
-            </p>
+            <h2 class="text-lg sm:text-xl font-bold text-slate-900 leading-snug mb-2">${paper.title}</h2>
+            <p class="text-xs text-slate-400 italic line-clamp-1">原題: ${paper.original_title}</p>
           </div>
-
-          <!-- 要約ハイライト -->
           <div class="bg-indigo-50/50 px-5 sm:px-6 py-3 border-b border-slate-100 text-sm text-indigo-950 font-medium leading-relaxed">
             💡 <strong>要点:</strong> ${paper.summary}
           </div>
-
-          <!-- 詳細コンテンツ -->
           <div class="p-5 sm:p-6 space-y-4 text-sm text-slate-700">
             <div>
-              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">
-                ❓ 研究の背景
-              </h3>
+              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">❓ 研究の背景</h3>
               <p class="leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">${paper.background}</p>
             </div>
-
             <div>
-              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">
-                🧪 わかったこと
-              </h3>
+              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">🧪 わかったこと</h3>
               <p class="leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">${paper.findings}</p>
             </div>
-
             <div>
-              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">
-                🌱 日常への活用アイデア
-              </h3>
+              <h3 class="font-bold text-slate-900 flex items-center mb-1 text-xs uppercase tracking-wider text-indigo-600">🌱 日常への活用アイデア</h3>
               <p class="leading-relaxed bg-emerald-50 text-emerald-950 p-3 rounded-lg border border-emerald-100">${paper.application}</p>
             </div>
           </div>
-
-          <!-- フッター（原文リンク） -->
           <div class="bg-slate-50 px-5 sm:px-6 py-3 border-t border-slate-100 flex items-center justify-between text-xs">
             <span class="text-slate-400">発行年: ${paper.publication_date || '不明'}</span>
-            ${paper.url ? `
-              <a href="${paper.url}" target="_blank" rel="noopener noreferrer" 
-                class="inline-flex items-center text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
-                原著論文を読む (外部) 
-                <svg class="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-              </a>
-            ` : ''}
+            ${paper.url ? `<a href="${paper.url}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium">原著論文を読む (外部) ↗</a>` : ''}
           </div>
-
         </article>
       `).join('');
     }
 
-    // リアルタイム検索イベント
-    document.getElementById('searchInput').addEventListener('input', renderPapers);
+    // 2. OpenAlex APIによるライブ論文サーチ
+    async function executeLiveSearch() {
+      const keyword = document.getElementById('liveSearchInput').value.trim();
+      if (!keyword) return;
 
-    // 初期化実行
+      const loading = document.getElementById('liveLoading');
+      const grid = document.getElementById('liveResultsGrid');
+
+      loading.classList.remove('hidden');
+      grid.innerHTML = '';
+
+      try {
+        // OpenAlex API 呼び出し (心理学コンセプト: C15744967)
+        const url = `https://api.openalex.org/works?search=${encodeURIComponent(keyword)}&filter=concepts.id:C15744967,has_abstract:true&per-page=10`;
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        loading.classList.add('hidden');
+
+        if (!data.results || data.results.length === 0) {
+          grid.innerHTML = `
+            <div class="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500">
+              「${keyword}」に一致する心理学論文が見つかりませんでした。別の英語キーワードで検索してみてください。
+            </div>
+          `;
+          return;
+        }
+
+        grid.innerHTML = data.results.map(item => {
+          // Abstract復元
+          let abstractText = "アブストラクト情報なし";
+          if (item.abstract_inverted_index) {
+            const wordPositions = [];
+            for (const [word, positions] of Object.entries(item.abstract_inverted_index)) {
+              for (const pos of positions) wordPositions.push([pos, word]);
+            }
+            wordPositions.sort((a, b) => a[0] - b[0]);
+            abstractText = wordPositions.map(x => x[1]).join(' ');
+          }
+
+          const paperUrl = item.doi || item.id;
+          const authors = item.authorships ? item.authorships.slice(0, 3).map(a => a.author.display_name).join(', ') : '著者不明';
+
+          return `
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-indigo-200 transition-colors">
+              <div class="flex justify-between items-start gap-2 mb-2">
+                <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                  ${item.publication_year || '年不明'}
+                </span>
+                <span class="text-xs text-slate-400">被引用数: ${item.cited_by_count || 0}回</span>
+              </div>
+              <h3 class="font-bold text-slate-900 text-base mb-1">${item.title}</h3>
+              <p class="text-xs text-slate-500 mb-3">著者: ${authors}</p>
+              <p class="text-xs text-slate-600 bg-slate-50 p-3 rounded border border-slate-100 line-clamp-4 leading-relaxed">
+                ${abstractText}
+              </p>
+              <div class="mt-3 text-right">
+                <a href="${paperUrl}" target="_blank" class="inline-block text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                  論文の原文ページを開く (外部) ↗
+                </a>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error(err);
+        loading.classList.add('hidden');
+        grid.innerHTML = `
+          <div class="bg-red-50 text-red-700 p-4 rounded-xl text-center text-sm">
+            検索中にエラーが発生しました。時間を置いて再度お試しください。
+          </div>
+        `;
+      }
+    }
+
+    // イベント設定
+    document.getElementById('searchInput').addEventListener('input', renderPapers);
+    document.getElementById('liveSearchInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') executeLiveSearch();
+    });
+
+    // 初期実行
     loadPapers();
   </script>
 </body>
